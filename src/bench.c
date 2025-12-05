@@ -32,6 +32,10 @@ static void help(int default_iters) {
     printf("    - ElligatorSwift (optional module)\n");
 #endif
 
+#ifdef ENABLE_MODULE_MUSIG
+    printf("    - MuSig (optional module)\n");
+#endif
+
     printf("\n");
     printf("The default number of iterations for each benchmark is %d. This can be\n", default_iters);
     printf("customized using the SECP256K1_BENCH_ITERS environment variable.\n");
@@ -66,6 +70,10 @@ static void help(int default_iters) {
     printf("    ellswift_decode   : ElligatorSwift decoding\n");
     printf("    ellswift_keygen   : ElligatorSwift key generation\n");
     printf("    ellswift_ecdh     : ECDH on ElligatorSwift keys\n");
+#endif
+
+#ifdef ENABLE_MODULE_MUSIG
+    printf("    musig             : all MuSig algorithms\n");
 #endif
 
     printf("\n");
@@ -170,6 +178,10 @@ static void bench_keygen_run(void *arg, int iters) {
 # include "modules/ellswift/bench_impl.h"
 #endif
 
+#ifdef ENABLE_MODULE_MUSIG
+# include "modules/musig/bench_impl.h"
+#endif
+
 int main(int argc, char** argv) {
     int i;
     secp256k1_pubkey pubkey;
@@ -236,6 +248,15 @@ int main(int argc, char** argv) {
     }
 #endif
 
+#ifndef ENABLE_MODULE_MUSIG
+    if (have_flag(argc, argv, "musig")) {
+        fprintf(stderr, "./bench: MuSig module not enabled.\n");
+        fprintf(stderr, "Use ./configure --enable-module-musig, or compile with -DSECP256K1_ENABLE_MODULE_RECOVERY=ON.\n\n");
+        return EXIT_FAILURE;
+    }
+#endif
+
+
     /* ECDSA benchmark */
     data.ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
 
@@ -278,6 +299,11 @@ int main(int argc, char** argv) {
 #ifdef ENABLE_MODULE_ELLSWIFT
     /* ElligatorSwift benchmarks */
     run_ellswift_bench(iters, argc, argv);
+#endif
+
+#ifdef ENABLE_MODULE_MUSIG
+    /* MuSig benchmarks */
+    run_musig_bench(iters, argc, argv);
 #endif
 
     return EXIT_SUCCESS;
