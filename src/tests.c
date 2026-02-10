@@ -42,6 +42,25 @@
 static secp256k1_context *CTX = NULL;
 static secp256k1_context *STATIC_CTX = NULL;
 
+/* Scalar constants used across multiple tests. Macros provide constant-expression
+ * initializers for static arrays (required by MSVC); the static consts are for
+ * use in functions (e.g. taking address). */
+#define SECP256K1_TEST_SCALAR_MAX_MINUS_ONE SECP256K1_SCALAR_CONST( \
+    0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFEUL, \
+    0xBAAEDCE6UL, 0xAF48A03BUL, 0xBFD25E8CUL, 0xD0364140UL)
+static const secp256k1_scalar scalar_max_minus_one = SECP256K1_TEST_SCALAR_MAX_MINUS_ONE;
+
+/* Half the secp256k1 curve order plus 1 (equals inverse of 2 mod n). */
+#define SECP256K1_TEST_SCALAR_HALF_ORDER_PLUS_1 SECP256K1_SCALAR_CONST( \
+    0x7FFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, \
+    0x5D576E73UL, 0x57A4501DUL, 0xDFE92F46UL, 0x681B20A1UL)
+static const secp256k1_scalar scalar_half_order_plus_1 = SECP256K1_TEST_SCALAR_HALF_ORDER_PLUS_1;
+
+#define SECP256K1_TEST_SCALAR_MAX SECP256K1_SCALAR_CONST( \
+    0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, \
+    0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL)
+static const secp256k1_scalar scalar_max = SECP256K1_TEST_SCALAR_MAX;
+
 static int all_bytes_equal(const void* s, unsigned char value, size_t n) {
     const unsigned char *p = s;
     size_t i;
@@ -2195,10 +2214,6 @@ static void run_scalar_set_b32_seckey_tests(void) {
 
 static void test_scalar_check_overflow(void) {
     secp256k1_scalar s;
-    const secp256k1_scalar n_minus_1 = SECP256K1_SCALAR_CONST(
-        0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFEUL,
-        0xBAAEDCE6UL, 0xAF48A03BUL, 0xBFD25E8CUL, 0xD0364140UL
-    );
     const secp256k1_scalar n = SECP256K1_SCALAR_CONST(
         0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFEUL,
         0xBAAEDCE6UL, 0xAF48A03BUL, 0xBFD25E8CUL, 0xD0364141UL
@@ -2207,19 +2222,15 @@ static void test_scalar_check_overflow(void) {
         0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFEUL,
         0xBAAEDCE6UL, 0xAF48A03BUL, 0xBFD25E8CUL, 0xD0364142UL
     );
-    const secp256k1_scalar max = SECP256K1_SCALAR_CONST(
-        0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL,
-        0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL
-    );
 
     int i;
 
     secp256k1_scalar_set_int(&s, 0);
     CHECK(secp256k1_scalar_check_overflow(&s) == 0);
-    CHECK(secp256k1_scalar_check_overflow(&n_minus_1) == 0);
+    CHECK(secp256k1_scalar_check_overflow(&scalar_max_minus_one) == 0);
     CHECK(secp256k1_scalar_check_overflow(&n) == 1);
     CHECK(secp256k1_scalar_check_overflow(&n_plus_1) == 1);
-    CHECK(secp256k1_scalar_check_overflow(&max) == 1);
+    CHECK(secp256k1_scalar_check_overflow(&scalar_max) == 1);
 
     for (i = 0; i < 2 * COUNT; i++) {
         int expected_overflow;
@@ -2280,17 +2291,17 @@ static void run_scalar_tests(void) {
         /* Test that halving and doubling roundtrips on some fixed values. */
         static const secp256k1_scalar HALF_TESTS[] = {
             /* 0 */
-            SECP256K1_SCALAR_CONST(0, 0, 0, 0, 0, 0, 0, 0),
+            secp256k1_scalar_zero,
             /* 1 */
-            SECP256K1_SCALAR_CONST(0, 0, 0, 0, 0, 0, 0, 1),
+            secp256k1_scalar_one,
             /* -1 */
-            SECP256K1_SCALAR_CONST(0xfffffffful, 0xfffffffful, 0xfffffffful, 0xfffffffeul, 0xbaaedce6ul, 0xaf48a03bul, 0xbfd25e8cul, 0xd0364140ul),
+            SECP256K1_TEST_SCALAR_MAX_MINUS_ONE,
             /* -2 (largest odd value) */
             SECP256K1_SCALAR_CONST(0xfffffffful, 0xfffffffful, 0xfffffffful, 0xfffffffeul, 0xbaaedce6ul, 0xaf48a03bul, 0xbfd25e8cul, 0xd036413Ful),
             /* Half the secp256k1 order */
             SECP256K1_SCALAR_CONST(0x7ffffffful, 0xfffffffful, 0xfffffffful, 0xfffffffful, 0x5d576e73ul, 0x57a4501dul, 0xdfe92f46ul, 0x681b20a0ul),
             /* Half the secp256k1 order + 1 */
-            SECP256K1_SCALAR_CONST(0x7ffffffful, 0xfffffffful, 0xfffffffful, 0xfffffffful, 0x5d576e73ul, 0x57a4501dul, 0xdfe92f46ul, 0x681b20a1ul),
+            SECP256K1_TEST_SCALAR_HALF_ORDER_PLUS_1,
             /* 2^255 */
             SECP256K1_SCALAR_CONST(0x80000000ul, 0, 0, 0, 0, 0, 0, 0),
             /* 2^255 - 1 */
@@ -3302,11 +3313,6 @@ static void run_sqrt(void) {
 
 /***** FIELD/SCALAR INVERSE TESTS *****/
 
-static const secp256k1_scalar scalar_minus_one = SECP256K1_SCALAR_CONST(
-    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFE,
-    0xBAAEDCE6, 0xAF48A03B, 0xBFD25E8C, 0xD0364140
-);
-
 static const secp256k1_fe fe_minus_one = SECP256K1_FE_CONST(
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFE, 0xFFFFFC2E
@@ -3331,10 +3337,10 @@ static void test_inverse_scalar(secp256k1_scalar* out, const secp256k1_scalar* x
     }
     secp256k1_scalar_mul(&t, x, &l);                                             /* t = x*(1/x) */
     CHECK(secp256k1_scalar_is_one(&t));                                          /* x*(1/x) == 1 */
-    secp256k1_scalar_add(&r, x, &scalar_minus_one);                              /* r = x-1 */
+    secp256k1_scalar_add(&r, x, &scalar_max_minus_one);                              /* r = x-1 */
     if (secp256k1_scalar_is_zero(&r)) return;
     (var ? secp256k1_scalar_inverse_var : secp256k1_scalar_inverse)(&r, &r); /* r = 1/(x-1) */
-    secp256k1_scalar_add(&l, &scalar_minus_one, &l);                             /* l = 1/x-1 */
+    secp256k1_scalar_add(&l, &scalar_max_minus_one, &l);                             /* l = 1/x-1 */
     (var ? secp256k1_scalar_inverse_var : secp256k1_scalar_inverse)(&l, &l); /* l = 1/(1/x-1) */
     secp256k1_scalar_add(&l, &l, &secp256k1_scalar_one);                         /* l = 1/(1/x-1)+1 */
     secp256k1_scalar_add(&l, &r, &l);                                            /* l = 1/(1/x-1)+1 + 1/(x-1) */
@@ -3476,17 +3482,17 @@ static void run_inverse_tests(void)
     /* Fixed test cases for scalar inverses: pairs of (x, 1/x) mod n. */
     static const secp256k1_scalar scalar_cases[][2] = {
         /* 0 */
-        {SECP256K1_SCALAR_CONST(0, 0, 0, 0, 0, 0, 0, 0),
-         SECP256K1_SCALAR_CONST(0, 0, 0, 0, 0, 0, 0, 0)},
+        {secp256k1_scalar_zero,
+         secp256k1_scalar_zero},
         /* 1 */
-        {SECP256K1_SCALAR_CONST(0, 0, 0, 0, 0, 0, 0, 1),
-         SECP256K1_SCALAR_CONST(0, 0, 0, 0, 0, 0, 0, 1)},
+        {secp256k1_scalar_one,
+         secp256k1_scalar_one},
         /* -1 */
-        {SECP256K1_SCALAR_CONST(0xffffffff, 0xffffffff, 0xffffffff, 0xfffffffe, 0xbaaedce6, 0xaf48a03b, 0xbfd25e8c, 0xd0364140),
-         SECP256K1_SCALAR_CONST(0xffffffff, 0xffffffff, 0xffffffff, 0xfffffffe, 0xbaaedce6, 0xaf48a03b, 0xbfd25e8c, 0xd0364140)},
+        {SECP256K1_TEST_SCALAR_MAX_MINUS_ONE,
+         SECP256K1_TEST_SCALAR_MAX_MINUS_ONE},
         /* 2 */
         {SECP256K1_SCALAR_CONST(0, 0, 0, 0, 0, 0, 0, 2),
-         SECP256K1_SCALAR_CONST(0x7fffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x5d576e73, 0x57a4501d, 0xdfe92f46, 0x681b20a1)},
+         SECP256K1_TEST_SCALAR_HALF_ORDER_PLUS_1},
         /* 2**128 */
         {SECP256K1_SCALAR_CONST(0, 0, 0, 1, 0, 0, 0, 0),
          SECP256K1_SCALAR_CONST(0x50a51ac8, 0x34b9ec24, 0x4b0dff66, 0x5588b13e, 0x9984d5b3, 0xcf80ef0f, 0xd6a23766, 0xa3ee9f22)},
@@ -7649,19 +7655,15 @@ static void fe_storage_cmov_test(void) {
 }
 
 static void scalar_cmov_test(void) {
-    static const secp256k1_scalar max = SECP256K1_SCALAR_CONST(
-        0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFEUL,
-        0xBAAEDCE6UL, 0xAF48A03BUL, 0xBFD25E8CUL, 0xD0364140UL
-    );
-    secp256k1_scalar r = max;
+    secp256k1_scalar r = scalar_max_minus_one;
     secp256k1_scalar a = secp256k1_scalar_zero;
 
     secp256k1_scalar_cmov(&r, &a, 0);
-    CHECK(secp256k1_memcmp_var(&r, &max, sizeof(r)) == 0);
+    CHECK(secp256k1_memcmp_var(&r, &scalar_max_minus_one, sizeof(r)) == 0);
 
-    r = secp256k1_scalar_zero; a = max;
+    r = secp256k1_scalar_zero; a = scalar_max_minus_one;
     secp256k1_scalar_cmov(&r, &a, 1);
-    CHECK(secp256k1_memcmp_var(&r, &max, sizeof(r)) == 0);
+    CHECK(secp256k1_memcmp_var(&r, &scalar_max_minus_one, sizeof(r)) == 0);
 
     a = secp256k1_scalar_zero;
     secp256k1_scalar_cmov(&r, &a, 1);
