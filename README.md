@@ -170,6 +170,13 @@ Reporting a vulnerability
 
 See [SECURITY.md](SECURITY.md)
 
+Contributors
+------------
+
+This project has been made possible by the contributions of many individuals. Thank you to all [138 contributors](https://github.com/bitcoin-core/secp256k1/graphs/contributors) who have helped make libsecp256k1 what it is today.
+
+For a complete list of contributors, see the [GitHub contributors page](https://github.com/bitcoin-core/secp256k1/graphs/contributors).
+
 Contributing to libsecp256k1
 ------------
 
